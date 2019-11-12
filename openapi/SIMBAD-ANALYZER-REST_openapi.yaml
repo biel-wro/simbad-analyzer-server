@@ -1,0 +1,153 @@
+openapi: 3.0.0
+
+info:
+  title: SIMBAD-ANALYZER REST API
+  version: v1
+  contact:
+    email: jakub.sokolowski1996@gmai.com
+
+tags:
+  - name: SIMBAD-PIPELINE
+
+servers:
+  - url: /api/analyzer
+
+paths:
+  /api/analyzer/start:
+    post:
+      tags:
+        - SIMULATION
+        - ANALYZER
+      operationId: startAnalyzer
+      description: Starts SIMBAD-ANALYZER step
+      requestBody:
+        content:
+          application:/json:
+            schema:
+              $ref: "#/components/schemas/StartAnalyzerRequest"
+      responses:
+        "202":
+          description: Request is accepted and command starts to execute
+        "400":
+          description: Analyzer process is already running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyzerError"
+  /api/analyzer/status:
+    get:
+      tags:
+        - SIMULATION
+        - ANALYZER
+      oeprationId: getAnalyzerStatus
+      description: Returns current status of SIMBAD-ANALYZER
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyzerStatus"
+
+  /api/analyzer/runtime:
+    get:
+      tags:
+        - SIMULATION
+        - ANALYZER
+      operationId: getAnalyzerRuntimeInfo
+      description: Returns runtime info of analyzer step currently being executed byt SIMBAD-ANALYZER
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzerRuntimeInfo'
+  /api/analyzer/result:
+    get:
+      tags:
+        - SIMULATION
+        - ANALYZER
+      operationId: getAnalyzerResult
+      description: Returns result of latest SIMBAD-ANALYZER run
+      responses:
+        "200":
+          descrption: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzerResult'
+
+components:
+  schemas:
+    StartAnalyzerRequest:
+      type: object
+      properties:
+        path:
+          description: The path to SIMBAD-CLI cli_out.csv file
+          type: string
+      required:
+        - path
+    AnalyzerError:
+      type: object
+      properties:
+        cause:
+          description: The cause of an error
+          type: string
+    AnalyzerStatus:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - BUSY
+            - IDLE
+          description: Simulation status - BUSY / IDLE
+      example:
+        status: BUSY
+    ArtifactInfo:
+      type: object
+      required:
+        - createdUtc
+        - sizeKb
+        - path
+      properties:
+        createdUtc:
+          type: string
+          description: UTC timestamp when artifact was created
+        sizeKb:
+          type: number
+          description: The size of artifact in kb
+        path:
+          type: string
+          description: The path to artifact in filesystem
+      example:
+        createdUtc: 123124124
+        sizeKb: 120
+        path:  /home/user/dev/simbad/data/SIM_0_CONF_parametric_evolution_3d/cli_out.csv
+    AnalyzerResult:
+      type: object
+      properties:
+        artifacts:
+          description: The resulting artifact files
+          type: array
+          items:
+            $ref: '#/components/schemas/ArtifactInfo'
+    AnalyzerRuntimeInfo:
+      type: object
+      required:
+        - jobId
+        - progress
+        - finished
+      properties:
+        jobId:
+          type: number
+          description: Id of spark job
+        progress:
+          type: number
+          description: The estimated progress of spark job
+        finished:
+          type: bool
+          description: Flag that telsl whether job is finished
