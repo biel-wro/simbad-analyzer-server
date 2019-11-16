@@ -1,0 +1,11 @@
+version: '3.4'
+services:
+  server:
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile
+    image: simbad-analyzer-server
+    command: python3 api.py --port 8083 --debug
+    env_file:
+      - ./docker.env
+    network_mode: host

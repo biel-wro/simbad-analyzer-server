@@ -16,8 +16,7 @@ paths:
   /api/analyzer/start:
     post:
       tags:
-        - SIMULATION
-        - ANALYZER
+        - COMMAND
       operationId: startAnalyzer
       description: Starts SIMBAD-ANALYZER step
       requestBody:
@@ -37,9 +36,8 @@ paths:
   /api/analyzer/status:
     get:
       tags:
-        - SIMULATION
-        - ANALYZER
-      oeprationId: getAnalyzerStatus
+        - STATUS
+      operationId: getAnalyzerStatus
       description: Returns current status of SIMBAD-ANALYZER
       responses:
         "200":
@@ -52,10 +50,9 @@ paths:
   /api/analyzer/runtime:
     get:
       tags:
-        - SIMULATION
-        - ANALYZER
+        - STATUS
       operationId: getAnalyzerRuntimeInfo
-      description: Returns runtime info of analyzer step currently being executed byt SIMBAD-ANALYZER
+      description: Returns runtime info of analyzer step currently being executed by SIMBAD-ANALYZER
       responses:
         "200":
           description: OK
@@ -66,13 +63,12 @@ paths:
   /api/analyzer/result:
     get:
       tags:
-        - SIMULATION
-        - ANALYZER
+        - STATUS
       operationId: getAnalyzerResult
       description: Returns result of latest SIMBAD-ANALYZER run
       responses:
         "200":
-          descrption: OK
+          description: OK
           content:
             application/json:
               schema:
@@ -149,5 +145,5 @@ components:
           type: number
           description: The estimated progress of spark job
         finished:
-          type: bool
+          type: boolean
           description: Flag that telsl whether job is finished
