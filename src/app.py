@@ -8,6 +8,7 @@ import sys
 import threading
 from functools import reduce
 from time import sleep
+from typing import List
 
 from flask import Flask, request, jsonify
 
@@ -46,7 +47,7 @@ analyzer_result: list = []
 
 spark_out = ""
 
-expected_files = [
+expected_files: List[str] = [
     "time_points.parquet",
     "large_clones.parquet",
     "clone_snapshots.parquet",
@@ -65,7 +66,28 @@ expected_files = [
     "muller_data.parquet",
     "noise_stats.parquet",
     "noise_stats_scalars.parquet",
-    "time_points.parquet"
+    "time_points.parquet",
+    "final_snapshot.csv",
+    "histogram_birthEfficiency.csv",
+    "histogram_birthResistance.csv",
+    "histogram_lifespanEfficiency.csv",
+    "histogram_lifespanEfficiency.csv",
+    "histogram_lifespanEfficiency.csv",
+    "histogram_lifespanResistance.csv",
+    "histogram_successEfficiency.csv",
+    "histogram_successResistance.csv",
+    "major_histogram_birthEfficiency.csv",
+    "major_histogram_birthResistance.csv",
+    "major_histogram_lifespanEfficiency.csv",
+    "major_histogram_lifespanResistance.csv",
+    "major_histogram_successEfficiency.csv",
+    "major_histogram_successResistance.csv",
+    "noise_histogram_birthEfficiency.csv",
+    "noise_histogram_birthResistance.csv",
+    "noise_histogram_lifespanEfficiency.csv",
+    "noise_histogram_lifespanResistance.csv",
+    "noise_histogram_successEfficiency.csv",
+    "noise_histogram_successResistance.csv"
 ]
 
 
@@ -110,11 +132,11 @@ def update_runtime_info() -> None:
     """
     global analyzer_status, analyzer_result, runtime_info
     while runtime_info['finished'] is not True:
-        num_expected_files: int = len(expected_files)
+        num_expected_files: int = len(list(filter(lambda f: f.endswith('.parquet'), expected_files)))
 
         num_existing_files: int = 0
         for file in expected_files:
-            if os.path.exists(spark_out + "/" + file):
+            if file.endswith('.parquet') and os.path.exists(spark_out + "/" + file):
                 num_existing_files += 1
 
         progress: int = int((num_existing_files / num_expected_files) * 100)
