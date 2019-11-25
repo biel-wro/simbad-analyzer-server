@@ -6,7 +6,6 @@ import shutil
 import subprocess
 import sys
 import threading
-from functools import reduce
 from time import sleep
 from typing import List
 
@@ -107,10 +106,18 @@ def start_analyzer(path: str) -> None:
     os.environ["SIMBAD_ANALYZER_WORKDIR"] = workdir + "/output_data"
 
     spark_warehouse_dir = "/usr/analyzer-server/app/spark-warehouse"
+    checkpoints_dir = "/usr/analyzer-server/app/checkpoints"
+    out_checkpoints_dir = spark_out + "/checkpoints"
 
     if os.path.exists(spark_warehouse_dir) and os.path.isdir(spark_warehouse_dir):
         sys.stderr.write("Removing warehouse...\n")
         shutil.rmtree(spark_warehouse_dir)
+    if os.path.exists(checkpoints_dir) and os.path.isdir(checkpoints_dir):
+        sys.stderr.write("Removing checkpoints...\n")
+        shutil.rmtree(checkpoints_dir)
+    if os.path.exists(out_checkpoints_dir) and os.path.isdir(out_checkpoints_dir):
+        sys.stderr.write("Removing output_data/checkpoints/...\n")
+        shutil.rmtree(out_checkpoints_dir)
 
     reader_cmd = "spark-submit --master local --class analyzer.StreamReader /jar/analyzer.jar {} {}".format(path,
                                                                                                             stream_dir)
