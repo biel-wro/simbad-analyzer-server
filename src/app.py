@@ -119,12 +119,18 @@ def start_analyzer(path: str) -> None:
         sys.stderr.write("Removing output_data/checkpoints/...\n")
         shutil.rmtree(out_checkpoints_dir)
 
-    reader_cmd = "spark-submit --master local --class analyzer.StreamReader /jar/analyzer.jar {} {}".format(path,
-                                                                                                            stream_dir)
+    reader_cmd = "" \
+                 "spark-submit" \
+                 " --master local " \
+                 "--class analyzer.StreamReader " \
+                 "/jar/analyzer.jar {} {}"\
+                 .format(path, stream_dir)
     reader_process = subprocess.Popen(reader_cmd, shell=True)
     reader_process.wait()
-    analyzer_cmd = "spark-submit --master local --class analyzer.Analyzer /jar/analyzer.jar {} {}".format(stream_dir,
-                                                                                                          spark_out_dir)
+    analyzer_cmd = "spark-submit" \
+                   " --master local " \
+                   "--class analyzer.Analyzer /jar/analyzer.jar {} {}"\
+                   .format(stream_dir, spark_out_dir)
     subprocess.Popen(analyzer_cmd, shell=True)
     thread = threading.Thread(target=update_runtime_info)
     thread.daemon = True
@@ -170,7 +176,7 @@ def get_analyzer_result() -> list:
 
 @app.route('/api/analyzer/start', methods=['POST'])
 def start():
-    global analyzer_status
+    global analyzer_status, analyzer_result, runtime_info
     if analyzer_status['status'] is 'BUSY':
         app.logger.info('Start request failed - analyzer is BUSY')
         return {"status": "failed"}, 402
@@ -179,6 +185,10 @@ def start():
     request_data: dict = request_to_json(request)
     path: str = request_data['path']
     analyzer_status['status'] = 'BUSY'
+    analyzer_result = []
+    runtime_info['progress'] = 0
+    runtime_info['finished'] = False
+
     start_analyzer(path)
     return "OK", 202
 
