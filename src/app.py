@@ -8,12 +8,12 @@ import sys
 import threading
 from time import sleep
 from typing import List
+from logging.config import dictConfig
 
 from flask import Flask, request, jsonify
 
 logging.basicConfig(level=logging.INFO)
 
-from logging.config import dictConfig
 
 dictConfig({
     'version': 1,
@@ -123,14 +123,14 @@ def start_analyzer(path: str) -> None:
                  "spark-submit" \
                  " --master local " \
                  "--class analyzer.StreamReader " \
-                 "/jar/analyzer.jar {} {}"\
-                 .format(path, stream_dir)
+                 "/jar/analyzer.jar {} {}" \
+        .format(path, stream_dir)
     reader_process = subprocess.Popen(reader_cmd, shell=True)
     reader_process.wait()
     analyzer_cmd = "spark-submit" \
                    " --master local " \
-                   "--class analyzer.Analyzer /jar/analyzer.jar {} {}"\
-                   .format(stream_dir, spark_out_dir)
+                   "--class analyzer.Analyzer /jar/analyzer.jar {} {}" \
+        .format(stream_dir, spark_out_dir)
     subprocess.Popen(analyzer_cmd, shell=True)
     thread = threading.Thread(target=update_runtime_info)
     thread.daemon = True
@@ -143,13 +143,13 @@ def update_runtime_info() -> None:
     Periodically update runtime info of current analyzer job
     :return:
     """
-    global analyzer_status, analyzer_result, runtime_info
+    global analyzer_status, analyzer_result, runtime_info, spark_out
     while runtime_info['finished'] is not True:
-        num_expected_files: int = len(list(filter(lambda f: f.endswith('.parquet'), expected_files)))
+        num_expected_files: int = len(expected_files)
 
         num_existing_files: int = 0
         for file in expected_files:
-            if file.endswith('.parquet') and os.path.exists(spark_out + "/" + file):
+            if os.path.exists(spark_out + "/" + file):
                 num_existing_files += 1
 
         progress: int = int((num_existing_files / num_expected_files) * 100)
@@ -163,6 +163,14 @@ def update_runtime_info() -> None:
             print('Runtime info', runtime_info)
 
         sleep(POLLING_PERIOD)
+
+    out_checkpoints_dir = spark_out + "/checkpoints"
+
+    if os.path.exists(out_checkpoints_dir) and os.path.isdir(out_checkpoints_dir):
+        sys.stderr.write("Removing output_data/checkpoints/...\n")
+        shutil.rmtree(out_checkpoints_dir)
+
+    return
 
 
 def get_analyzer_result() -> list:
