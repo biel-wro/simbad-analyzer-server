@@ -6,14 +6,13 @@ import shutil
 import subprocess
 import sys
 import threading
+from logging.config import dictConfig
 from time import sleep
 from typing import List
-from logging.config import dictConfig
 
 from flask import Flask, request, jsonify
 
 logging.basicConfig(level=logging.INFO)
-
 
 dictConfig({
     'version': 1,
@@ -40,11 +39,12 @@ SIMBAD_ANALYZER_STATUS_SCRIPT_PATH = os.getenv('SIMBAD_ANALYZER_STATUS_SCRIPT_PA
 SIMBAD_ANALYZER_RESULT_SCRIPT_PATH = os.getenv('SIMBAD_ANALYZER_RESULT_SCRIPT_PATH', './scripts/mock/result.sh')
 POLLING_PERIOD = 3
 
-runtime_info: dict = {'finished': False, "progress": 0}
+runtime_info: dict = {'finished': False, "progress": 0, "error": None}
 analyzer_status: dict = {"status": "IDLE"}
 analyzer_result: list = []
 
 spark_out = ""
+workdir = ""
 
 expected_files: List[str] = [
     "time_points.parquet",
@@ -98,8 +98,8 @@ def start_analyzer(path: str) -> None:
     :param path: the path to CLI output file
     :return:
     """
+    global spark_out, workdir
     workdir = os.path.dirname(path)
-    global spark_out
     spark_out = workdir + "/output_data"
     stream_dir = workdir + "/stream.parquet/"
     spark_out_dir = workdir + "/output_data"
@@ -119,22 +119,38 @@ def start_analyzer(path: str) -> None:
         sys.stderr.write("Removing output_data/checkpoints/...\n")
         shutil.rmtree(out_checkpoints_dir)
 
+    analyzer_log = open(os.path.join(workdir, 'logs', 'analyzer.log'), 'a')
+
     reader_cmd = "" \
                  "spark-submit" \
                  " --master local " \
                  "--class analyzer.StreamReader " \
                  "/jar/analyzer.jar {} {}" \
         .format(path, stream_dir)
-    reader_process = subprocess.Popen(reader_cmd, shell=True)
-    reader_process.wait()
+    subprocess.Popen(reader_cmd, shell=True, stderr=analyzer_log, stdout=analyzer_log).wait()
+
     analyzer_cmd = "spark-submit" \
                    " --master local " \
                    "--class analyzer.Analyzer /jar/analyzer.jar {} {}" \
         .format(stream_dir, spark_out_dir)
-    subprocess.Popen(analyzer_cmd, shell=True)
+
     thread = threading.Thread(target=update_runtime_info)
     thread.daemon = True
     thread.start()
+
+    subprocess.Popen(analyzer_cmd, shell=True, stderr=analyzer_log, stdout=analyzer_log).wait()
+    check_if_success()
+    return
+
+
+def check_if_success() -> None:
+    global analyzer_status, analyzer_result, runtime_info
+    sleep(POLLING_PERIOD)
+
+    if runtime_info['progress'] != 100:
+        runtime_info['error'] = 'Analyzer step failed'
+        runtime_info['finished'] = True
+        analyzer_result = get_analyzer_result()
     return
 
 
@@ -144,7 +160,7 @@ def update_runtime_info() -> None:
     :return:
     """
     global analyzer_status, analyzer_result, runtime_info, spark_out
-    while runtime_info['finished'] is not True:
+    while runtime_info['finished'] is False:
         num_expected_files: int = len(expected_files)
 
         num_existing_files: int = 0
@@ -156,11 +172,9 @@ def update_runtime_info() -> None:
         runtime_info['progress'] = progress
 
         if progress == 100:
-            print('Analyzer task finished')
             runtime_info['finished'] = True
             analyzer_status['status'] = 'IDLE'
             analyzer_result = get_analyzer_result()
-            print('Runtime info', runtime_info)
 
         sleep(POLLING_PERIOD)
 
@@ -179,7 +193,9 @@ def get_analyzer_result() -> list:
     of produced artifacts
     :return:
     """
-    return list(map(lambda file: spark_out + "/" + file, expected_files))
+    logs = [workdir + '/logs/analyzer.log']
+    expected_paths = list(map(lambda file: spark_out + "/" + file, expected_files))
+    return list(filter(lambda file: os.path.exists(file), logs + expected_paths))
 
 
 @app.route('/api/analyzer/start', methods=['POST'])
@@ -189,7 +205,6 @@ def start():
         app.logger.info('Start request failed - analyzer is BUSY')
         return {"status": "failed"}, 402
 
-    print(request.data)
     request_data: dict = request_to_json(request)
     path: str = request_data['path']
     analyzer_status['status'] = 'BUSY'
@@ -197,7 +212,9 @@ def start():
     runtime_info['progress'] = 0
     runtime_info['finished'] = False
 
-    start_analyzer(path)
+    thread = threading.Thread(target=start_analyzer, args=[path])
+    thread.daemon = True
+    thread.start()
     return "OK", 202
 
 
@@ -213,13 +230,6 @@ def runtime():
 
 @app.route('/api/analyzer/result')
 def result():
-    return jsonify(analyzer_result)
-
-
-@app.route('/', methods=['POST'])
-def test():
-    request_data: dict = request_to_json(request)
-    print(request_data)
     return jsonify(analyzer_result)
 
 
